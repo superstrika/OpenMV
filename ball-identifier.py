@@ -49,6 +49,12 @@ if FOCAL_LENGTH == 0:
     FOCAL_LENGTH = calibrate_focal_length(known_distance_cm=40)
 
 # ---------------------------
+# Filters
+# ---------------------------
+def grayScale(image, pixelLocation: tuple[int, int]):
+    image.setPixel(pixelLocation[0], pixelLocation[1])
+
+# ---------------------------
 # Main Loop
 # ---------------------------
 while True:
