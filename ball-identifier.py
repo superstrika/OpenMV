@@ -13,10 +13,9 @@ sensor.set_auto_whitebal(False)
 # ---------------------------
 # Parameters
 # ---------------------------
-# orange_threshold = (30, 80, 15, 70, 30, 80)
-# orange_threshold = (47, 100, -128, 127, 5, 127)
-# orange_threshold = (38, 100, 1, 32, 17, 127)
+
 orange_threshold = (38, 100, 1, 32, 10, 127)
+
 pixels_threshold = 50
 area_threshold = 50
 
@@ -51,21 +50,13 @@ def calibrate_focal_length(known_distance_cm):
 if FOCAL_LENGTH == 0:
     FOCAL_LENGTH = calibrate_focal_length(known_distance_cm=40)
 
-
-def grayScale(Image: sensor.image.Image, Location: tuple[int, int], Pixel: tuple[int, int, int]):
-    pass
-
-def MakeOranger(Image: sensor.image.Image, Location: tuple[int, int], Pixel: tuple[int, int, int]):
-    pass
-
-def isOrange(Image: sensor.image.Image, Location: tuple[int, int], Pixel: tuple[int, int, int]):
-    pass
 # ---------------------------
 # Main Loop
 # ---------------------------
 while True:
     clock.tick()
     img = sensor.snapshot()
+
     ball_found = False
 
     # Step 1: Color Detection
