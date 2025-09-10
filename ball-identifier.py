@@ -14,7 +14,9 @@ sensor.set_auto_whitebal(False)
 # Parameters
 # ---------------------------
 
-orange_threshold = (38, 100, 1, 32, 10, 127)
+# orange_threshold = (38, 100, 1, 32, 10, 127)
+# orange_threshold = (38, 100, 127, -128, 10, 127)
+orange_threshold = (46, 100, -128, 127, 20, 127)
 
 pixels_threshold = 50
 area_threshold = 50
