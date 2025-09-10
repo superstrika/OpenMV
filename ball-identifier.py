@@ -22,7 +22,7 @@ pixels_threshold = 50
 area_threshold = 50
 
 BALL_DIAMETER_CM = 4.3
-FOCAL_LENGTH = 0  # will be set after calibration
+FOCAL_LENGTH = 311.63  # will be set after calibration
 clock = time.clock()
 
 # ---------------------------
@@ -75,7 +75,7 @@ while True:
 
             # Step 2: Circle detection inside the blob only
             circles = roi_img.find_circles(threshold=2000, x_margin=0, y_margin=0,
-                                           r_margin=2, r_min=5, r_max=30, r_step=2)
+                                           r_margin=2, r_min=1, r_max=30, r_step=2)
 
             if circles:
                 # Take the largest circle inside the blob
