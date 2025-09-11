@@ -1,9 +1,8 @@
 import sensor, time
 from machine import UART, Pin
 
-
 class CameraDetection:
-    def __init__(self, exitPin: int) -> None:
+    def __init__(self, exitPin: str) -> None:
         # Camera Setup
         sensor.reset()
         sensor.set_pixformat(sensor.RGB565)
@@ -23,10 +22,10 @@ class CameraDetection:
         self.clock = time.clock()
 
         #UART Setup
-        self.comms = UART(2, 115200)
+        self.comms = UART(1, 115200)
         self.comms.init(115200, bits=8, parity=None, stop=1)
 
-        #ExitPin Setup
+        # ExitPin Setup
         self.EXIT = False
 
         self.exitPin = Pin(exitPin, Pin.IN, Pin.PULL_UP)
@@ -34,6 +33,7 @@ class CameraDetection:
 
         #Vars Setup
         self.bolb = None
+        self.bolbs = None
         self.img = None
         self.distance_cm = None
 
@@ -50,9 +50,9 @@ class CameraDetection:
             blobs = img.find_blobs([self.orange_threshold], pixels_threshold=self.pixels_threshold,
                                     area_threshold=self.area_threshold, merge=True)
             if blobs:
-                blob = max(blobs, key=lambda b: b.pixels())
-                if blob.elongation() < 0.5:
-                    perceived_diameter = (blob.w() + blob.h()) / 2
+                self.blob = max(blobs, key=lambda b: b.pixels())
+                if self.blob.elongation() < 0.5:
+                    perceived_diameter = (self.blob.w() + self.blob.h()) / 2
                     focal_length = (perceived_diameter * known_distance_cm) / self.BALL_DIAMETER_CM
                     print("Calibration complete!")
                     print("Perceived diameter: {:.2f} px".format(perceived_diameter))
@@ -86,8 +86,8 @@ class CameraDetection:
                 self.comms.write(data)
 
     def ballDetected(self) -> int:
-        blob = max(self.blobs, key=lambda b: b.pixels())
-        if blob.elongation() < 0.5:
+        self.blob = max(self.blobs, key=lambda b: b.pixels())
+        if self.blob.elongation() < 0.5:
             # Crop the blob region to focus circle detection
             roi = (self.blob.x(), self.blob.y(), self.blob.w(), self.blob.h())
             roi_img = self.img.copy(roi=roi)
@@ -132,12 +132,13 @@ class CameraDetection:
         return distance_cm
 
     def run(self) -> None:
+        # self.checkImage()
         while not self.EXIT:
             self.checkImage()
 
 
 def main() -> None:
-    camera = CameraDetection(exitPin=14)
+    camera = CameraDetection(exitPin="P0")
     camera.run()
 
 if __name__ == "__main__":
