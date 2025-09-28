@@ -1,8 +1,9 @@
 import sensor, time
+import math
 from machine import UART, Pin
 
 class CameraDetection:
-    def __init__(self, exitPin: str) -> None:
+    def __init__(self, exitPin: str, focalLength: float=0) -> None:
         # Camera Setup
         sensor.reset()
         sensor.set_pixformat(sensor.RGB565)
@@ -18,7 +19,7 @@ class CameraDetection:
         self.area_threshold = 50
 
         self.BALL_DIAMETER_CM = 4.3
-        self.FOCAL_LENGTH = 311.63  # will be re-set after calibration
+        self.FOCAL_LENGTH = focalLength  # will be re-set after calibration
         self.clock = time.clock()
 
         #UART Setup
@@ -36,6 +37,9 @@ class CameraDetection:
         self.bolbs = None
         self.img = None
         self.distance_cm = None
+
+        #Distance Calculation Setup
+        self.cameraHeight: int = 12 #cm
 
         #Begin setup
         self.begin()
@@ -63,7 +67,7 @@ class CameraDetection:
 
     def begin(self) -> None:
         if self.FOCAL_LENGTH == 0:
-            self.FOCAL_LENGTH = self.calibrate_focal_length(known_distance_cm=40)
+            self.calibateFocalLength(known_distance_cm=40)
 
     def checkImage(self) -> None:
         self.clock.tick()
@@ -75,13 +79,14 @@ class CameraDetection:
 
         # Find the largest blob
         if self.blobs:
-            distance_cm = self.ballDetected()
+            distance_cm = self.ballDetected() #distance from camera to ball
+
 
             if distance_cm is None:
                 print("No ball detected")
                 self.comms.write("0\n")
             else:
-                print("ball detected: {:.2f}\n".format(distance_cm))
+                print("ball detected: {:.2f} CM at angle: {:.2f}\n".format(*self.CalculateAngle(distance_cm)))
                 data = "{:.2f}\n".format(distance_cm)
                 self.comms.write(data)
 
@@ -113,9 +118,12 @@ class CameraDetection:
         perceived_diameter = 2 * largest_circle.r()
         distance_cm = (self.BALL_DIAMETER_CM * self.FOCAL_LENGTH) / perceived_diameter
 
-        # print("Ball detected at X:", largest_circle.x() + blob.x(),
-        #       "Y:", largest_circle.y() + blob.y(),
-        #       "Distance: {:.2f} cm".format(distance_cm))
+        # Angle calculation
+
+        # img_center_x = self.img.width() / 2
+
+        # print("Ball detected at X:", largest_circle.x() + self.blob.x(),
+        #       "Y:", largest_circle.y() + self.blob.y())
 
         return distance_cm
 
@@ -126,10 +134,23 @@ class CameraDetection:
         perceived_diameter = (self.blob.w() + self.blob.h()) / 2
         distance_cm = (self.BALL_DIAMETER_CM * self.FOCAL_LENGTH) / perceived_diameter
 
-        # print("Ball (blob fallback) at X:", blob.cx(), "Y:", blob.cy(),
-        #       "Distance: {:.2f} cm".format(distance_cm))
+        # print("Ball (blob fallback) at X:", self.blob.cx(), "Y:", self.blob.cy())
 
         return distance_cm
+
+    def CalculateAngle(self, distance: float) -> float:
+        distance_XY: float = math.sqrt(distance**2 - self.cameraHeight**2)
+
+        screenCenter: float = self.img.width() / 2
+        ballX: float = self.blob.cx() - screenCenter
+
+        PxToCmRatio = ((self.blob.w() + self.blob.h()) / 2) / self.BALL_DIAMETER_CM
+
+        ballXcm: float = ballX / PxToCmRatio
+
+        angle = math.degrees(math.asin(ballXcm / distance_XY))
+
+        return distance_XY, angle
 
     def run(self) -> None:
         # self.checkImage()
@@ -138,7 +159,7 @@ class CameraDetection:
 
 
 def main() -> None:
-    camera = CameraDetection(exitPin="P0")
+    camera = CameraDetection(exitPin="P0", focalLength=265.12)
     camera.run()
 
 if __name__ == "__main__":
