@@ -23,8 +23,8 @@ class CameraDetection:
         self.clock = time.clock()
 
         #UART Setup
-        self.comms = UART(1, 115200)
-        self.comms.init(115200, bits=8, parity=None, stop=1)
+        self.comms = UART(3, 9600)
+        self.comms.init(9600, bits=8, parity=None, stop=1)
 
         # ExitPin Setup
         self.EXIT = False
@@ -39,7 +39,7 @@ class CameraDetection:
         self.distance_cm = None
 
         #Distance Calculation Setup
-        self.cameraHeight: int = 12 #cm
+        self.cameraHeight: int = 13 #cm
 
         #Begin setup
         self.begin()
@@ -73,6 +73,7 @@ class CameraDetection:
         self.clock.tick()
         self.img = sensor.snapshot()
 
+
         # Color Detection
         self.blobs = self.img.find_blobs([self.orange_threshold], pixels_threshold=self.pixels_threshold,
                                 area_threshold=self.area_threshold, merge=True)
@@ -84,10 +85,11 @@ class CameraDetection:
 
             if distance_cm is None:
                 print("No ball detected")
-                self.comms.write("0\n")
+                # self.comms.write("0\n")
             else:
-                print("ball detected: {:.2f} CM at angle: {:.2f}\n".format(*self.CalculateAngle(distance_cm)))
-                data = "{:.2f}\n".format(distance_cm)
+                distanceXY: tuple = self.CalculateXY(distance_cm)
+                print("ball detected: X:{:.2f} Y:{:.2f} CM\n".format(*distanceXY))
+                data = "{:.2f}#{:.2f}\n".format(*distanceXY)
                 self.comms.write(data)
 
     def ballDetected(self) -> int:
@@ -101,10 +103,14 @@ class CameraDetection:
             self.circles = roi_img.find_circles(threshold=2000, x_margin=0, y_margin=0,
                                            r_margin=2, r_min=1, r_max=30, r_step=2)
 
+            screenCenter = self.img.width() / 2
+            self.img.draw_line(int(screenCenter), 0, int(screenCenter), self.img.height())
+
+
             if self.circles:
                 return self.CircleFound()
-            else:
-                return self.CircleNotFound()
+            # else:
+                # return self.CircleNotFound()
         return None
 
     def CircleFound(self) -> None:
@@ -138,19 +144,18 @@ class CameraDetection:
 
         return distance_cm
 
-    def CalculateAngle(self, distance: float) -> float:
-        distance_XY: float = math.sqrt(distance**2 - self.cameraHeight**2)
+    def CalculateXY(self, distance: float) -> float:
+        dXY: float = math.sqrt(distance**2 - self.cameraHeight**2)
 
         screenCenter: float = self.img.width() / 2
         ballX: float = self.blob.cx() - screenCenter
 
-        PxToCmRatio = (self.blob.w() / 2) / self.BALL_DIAMETER_CM
+        PxToCmRatio = (self.blob.w()) / self.BALL_DIAMETER_CM
 
-        ballXcm: float = ballX * PxToCmRatio
+        dX: float = ballX / PxToCmRatio
+        dY: float = math.sqrt(dXY**2 - dX**2)
 
-        angle = math.degrees(math.asin(ballXcm / distance_XY))
-
-        return distance_XY, angle
+        return dX,dY
 
     def run(self) -> None:
         # self.checkImage()
