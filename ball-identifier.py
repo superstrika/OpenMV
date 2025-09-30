@@ -144,9 +144,9 @@ class CameraDetection:
         screenCenter: float = self.img.width() / 2
         ballX: float = self.blob.cx() - screenCenter
 
-        PxToCmRatio = ((self.blob.w() + self.blob.h()) / 2) / self.BALL_DIAMETER_CM
+        PxToCmRatio = (self.blob.w() / 2) / self.BALL_DIAMETER_CM
 
-        ballXcm: float = ballX / PxToCmRatio
+        ballXcm: float = ballX * PxToCmRatio
 
         angle = math.degrees(math.asin(ballXcm / distance_XY))
 
