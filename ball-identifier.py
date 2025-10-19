@@ -14,11 +14,18 @@ class CameraDetection:
 
         # Parameters
         self.orange_threshold = (46, 100, -128, 127, 20, 127)
+        self.blue_threshold = (0, 47, -7, 127, -128, -18)
+        self.yellow_threshold = (39, 100, -31, 3, 18, 127)
 
-        self.pixels_threshold = 50
-        self.area_threshold = 50
+        self.ball_pixels_threshold = 50
+        self.ball_area_threshold = 50
+
+        # Goal detection parameters
+        self.goal_pixels_threshold = 100  # Higher threshold for larger goal
+        self.goal_area_threshold = 200    # Higher area threshold for goal
 
         self.BALL_DIAMETER_CM = 4.3
+        self.GOAL_DIAMETER_CM = 64
         self.FOCAL_LENGTH = focalLength  # will be re-set after calibration
         self.clock = time.clock()
 
@@ -51,8 +58,8 @@ class CameraDetection:
         print("Calibration started. Place the ball at {} cm from the camera.".format(known_distance_cm))
         while True:
             img = sensor.snapshot()
-            blobs = img.find_blobs([self.orange_threshold], pixels_threshold=self.pixels_threshold,
-                                    area_threshold=self.area_threshold, merge=True)
+            blobs = img.find_blobs([self.orange_threshold], pixels_threshold=self.ball_pixels_threshold,
+                                    area_threshold=self.ball_area_threshold, merge=True)
             if blobs:
                 self.blob = max(blobs, key=lambda b: b.pixels())
                 if self.blob.elongation() < 0.5:
@@ -75,22 +82,42 @@ class CameraDetection:
 
 
         # Color Detection
-        self.blobs = self.img.find_blobs([self.orange_threshold], pixels_threshold=self.pixels_threshold,
-                                area_threshold=self.area_threshold, merge=True)
+        self.blobs = self.img.find_blobs([self.orange_threshold], pixels_threshold=self.ball_pixels_threshold,
+                                area_threshold=self.ball_area_threshold, merge=True)
+
+
+        self.blueGoalBlobs = self.img.find_blobs([self.blue_threshold],
+                                            pixels_threshold=self.goal_pixels_threshold,
+                                            area_threshold=self.goal_area_threshold,
+                                            merge=True)
+
+        self.yellowGoalBlobs = self.img.find_blobs([self.yellow_threshold],
+                                           pixels_threshold=self.goal_pixels_threshold,
+                                           area_threshold=self.goal_area_threshold,
+                                           merge=True)
+
 
         # Find the largest blob
         if self.blobs:
-            distance_cm = self.ballDetected() #distance from camera to ball
+            ball_distance_cm = self.ballDetected() #distance from camera to ball
 
-
-            if distance_cm is None:
-                print("No ball detected")
-                # self.comms.write("0\n")
+            if ball_distance_cm is not None:
+                distanceXY: tuple = self.CalculateXY(ball_distance_cm)
             else:
-                distanceXY: tuple = self.CalculateXY(distance_cm)
-                print("ball detected: X:{:.2f} Y:{:.2f} CM\n".format(*distanceXY))
-                data = "{:.2f}#{:.2f}\n".format(*distanceXY)
-                self.comms.write(data)
+                distanceXY = (0,0)
+
+
+        if self.blueGoalBlobs:
+            blue_goal_distance_cm = self.goalDetected()
+
+        if self.yellowGoalBlobs:
+            yellow_goal_distance_cm = self.goalDetected()
+
+        if self.blueGoalBlobs and self.blobs and self.yellowGoalBlobs:
+            data = "{:.2f}#{:.2f}#{:.2f}#{:.2f}\n".format(*distanceXY, blue_goal_distance_cm, yellow_goal_distance_cm)
+            print(data)
+            self.comms.write(data)
+
 
     def ballDetected(self) -> int:
         self.blob = max(self.blobs, key=lambda b: b.pixels())
@@ -113,7 +140,24 @@ class CameraDetection:
                 # return self.CircleNotFound()
         return None
 
-    def CircleFound(self) -> None:
+    def goalDetected(self) -> int:
+        if not self.goalBlobs:
+            return None
+
+        self.goalBlob = max(self.goalBlobs, key=lambda b: b.pixels())
+
+        roi = (self.goalBlob.x(), self.goalBlob.y(), self.goalBlob.w(), self.goalBlob.h())
+        roi_img = self.img.copy(roi=roi)
+
+        self.rectangles = roi_img.find_rects(threshold=2000)
+        if self.rectangles:
+            return self.RectangleFound()
+        else:
+            # Fallback: use blob dimensions if no rectangle found
+            print("No rectangle found in goal blob, using blob dimensions")
+            return self.GoalBlobFallback()
+
+    def CircleFound(self) -> int:
         largest_circle = max(self.circles, key=lambda c: c.r())
 
         # Draw circle on original image (adjust coordinates)
@@ -130,6 +174,29 @@ class CameraDetection:
 
         # print("Ball detected at X:", largest_circle.x() + self.blob.x(),
         #       "Y:", largest_circle.y() + self.blob.y())
+
+        return distance_cm
+
+    def RectangleFound(self) -> int:
+        largest_rectangle = max(self.rectangles, key=lambda r: r.w())
+
+        # Draw rectangle on original image (adjust coordinates)
+        self.img.draw_rectangle(largest_rectangle.rect())
+
+        # Distance calculation
+        perceived_diameter = largest_rectangle.w()
+        distance_cm = (self.GOAL_DIAMETER_CM * self.FOCAL_LENGTH) / perceived_diameter
+
+        return distance_cm
+
+    def GoalBlobFallback(self) -> int:
+        # Fallback method when rectangle detection fails
+        # Use blob dimensions for distance calculation
+        self.img.draw_rectangle(self.goalBlob.rect())
+
+        # Use the width of the blob as perceived diameter
+        perceived_diameter = self.goalBlob.w()
+        distance_cm = (self.GOAL_DIAMETER_CM * self.FOCAL_LENGTH) / perceived_diameter
 
         return distance_cm
 
