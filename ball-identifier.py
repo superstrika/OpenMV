@@ -1,3 +1,5 @@
+from curses.textpad import rectangle
+
 import sensor, time
 import math
 from machine import UART, Pin
@@ -56,7 +58,7 @@ class CameraDetection:
 
     def calibateFocalLength(self, known_distance_cm: int) -> None:
         print("Calibration started. Place the ball at {} cm from the camera.".format(known_distance_cm))
-        while True:
+        while self.FOCAL_LENGTH != focal_length:
             img = sensor.snapshot()
             blobs = img.find_blobs([self.orange_threshold], pixels_threshold=self.ball_pixels_threshold,
                                     area_threshold=self.ball_area_threshold, merge=True)
@@ -103,20 +105,22 @@ class CameraDetection:
 
             if ball_distance_cm is not None:
                 distanceXY: tuple = self.CalculateXY(ball_distance_cm)
-            else:
-                distanceXY = (0,0)
-
+        else:
+            distanceXY: tuple = 0,0
 
         if self.blueGoalBlobs:
             blue_goal_distance_cm = self.goalDetected()
+        else:
+            blue_goal_distance_cm = 0
 
         if self.yellowGoalBlobs:
             yellow_goal_distance_cm = self.goalDetected()
+        else:
+            yellow_goal_distance_cm = 0
 
-        if self.blueGoalBlobs and self.blobs and self.yellowGoalBlobs:
-            data = "{:.2f}#{:.2f}#{:.2f}#{:.2f}\n".format(*distanceXY, blue_goal_distance_cm, yellow_goal_distance_cm)
-            print(data)
-            self.comms.write(data)
+        data = "{:.2f}#{:.2f}#{:.2f}#{:.2f}\n".format(*distanceXY, blue_goal_distance_cm, yellow_goal_distance_cm)
+        print(data)
+        self.comms.write(data)
 
 
     def ballDetected(self) -> int:
@@ -140,22 +144,22 @@ class CameraDetection:
                 # return self.CircleNotFound()
         return None
 
-    def goalDetected(self) -> int:
-        if not self.goalBlobs:
+    def goalDetected(self, bolb) -> int:
+        if not bolb:
             return None
 
-        self.goalBlob = max(self.goalBlobs, key=lambda b: b.pixels())
+        bolb = max(bolb, key=lambda b: b.pixels())
 
-        roi = (self.goalBlob.x(), self.goalBlob.y(), self.goalBlob.w(), self.goalBlob.h())
+        roi = (bolb.x(), bolb.y(), bolb.w(), bolb.h())
         roi_img = self.img.copy(roi=roi)
 
-        self.rectangles = roi_img.find_rects(threshold=2000)
-        if self.rectangles:
-            return self.RectangleFound()
+        rectangles = roi_img.find_rects(threshold=2000)
+        if rectangles:
+            return self.RectangleFound(rectangles)
         else:
             # Fallback: use blob dimensions if no rectangle found
             print("No rectangle found in goal blob, using blob dimensions")
-            return self.GoalBlobFallback()
+            return self.GoalBlobFallback(bolb)
 
     def CircleFound(self) -> int:
         largest_circle = max(self.circles, key=lambda c: c.r())
@@ -177,8 +181,8 @@ class CameraDetection:
 
         return distance_cm
 
-    def RectangleFound(self) -> int:
-        largest_rectangle = max(self.rectangles, key=lambda r: r.w())
+    def RectangleFound(self, rectangles) -> int:
+        largest_rectangle = max(rectangles, key=lambda r: r.w())
 
         # Draw rectangle on original image (adjust coordinates)
         self.img.draw_rectangle(largest_rectangle.rect())
@@ -189,13 +193,13 @@ class CameraDetection:
 
         return distance_cm
 
-    def GoalBlobFallback(self) -> int:
+    def GoalBlobFallback(self, bolb) -> int:
         # Fallback method when rectangle detection fails
         # Use blob dimensions for distance calculation
-        self.img.draw_rectangle(self.goalBlob.rect())
+        self.img.draw_rectangle(bolb.rect())
 
         # Use the width of the blob as perceived diameter
-        perceived_diameter = self.goalBlob.w()
+        perceived_diameter = bolb.w()
         distance_cm = (self.GOAL_DIAMETER_CM * self.FOCAL_LENGTH) / perceived_diameter
 
         return distance_cm
@@ -211,7 +215,7 @@ class CameraDetection:
 
         return distance_cm
 
-    def CalculateXY(self, distance: float) -> float:
+    def CalculateXY(self, distance: float) -> tuple[]:
         dXY: float = math.sqrt(distance**2 - self.cameraHeight**2)
 
         screenCenter: float = self.img.width() / 2
