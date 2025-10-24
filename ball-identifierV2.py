@@ -1,4 +1,3 @@
-# python
 import sensor
 import time
 import math
