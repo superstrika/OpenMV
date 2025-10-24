@@ -3,7 +3,6 @@ import sensor
 import time
 import math
 from machine import UART, Pin
-from typing import Optional, Tuple, List
 
 class CameraDetection:
     def __init__(self, exit_pin: str | int, focal_length: float = 0.0) -> None:
@@ -33,6 +32,7 @@ class CameraDetection:
         self.GOAL_DIAMETER_CM = 64.0
         self.focal_length = float(focal_length or 0.0)
         self.camera_height_cm = 13.0
+        self.MAX_LENGTH = 200 #cm
 
         # UART
         self.comms = UART(3, 9600)
@@ -102,14 +102,21 @@ class CameraDetection:
         else:
             x_cm, y_cm = 0.0, 0.0
 
-        data = "{:.2f},{:.2f}#{:.2f}#{:.2f}\n".format(x_cm, y_cm, blue_distance, yellow_distance)
+
+        dis = [x_cm, y_cm, blue_distance, yellow_distance]
+
+        for i in range(len(dis)):
+            if dis[i] >= self.MAX_LENGTH:
+                dis[i] = 0
+
+        data = "{:.2f},{:.2f}#{:.2f}#{:.2f}\n".format(*(tuple(dis)))
         print(data.strip())
         try:
             self.comms.write(data)
         except Exception as e:
             print(e)
 
-    def _process_ball(self, blobs: List) -> Optional[float]:
+    def _process_ball(self, blobs: list) -> float | None:
         self.blob = max(blobs, key=lambda b: b.pixels())
         if self.blob.elongation() >= 0.5:
             return None
@@ -140,7 +147,7 @@ class CameraDetection:
         perceived = (self.blob.w() + self.blob.h()) / 2.0
         return (self.BALL_DIAMETER_CM * self.focal_length) / perceived
 
-    def _process_goal(self, blobs: List) -> float:
+    def _process_goal(self, blobs: list) -> float:
         b = max(blobs, key=lambda x: x.pixels())
         roi = (b.x(), b.y(), b.w(), b.h())
         roi_img = self.img.copy(roi=roi)
@@ -149,7 +156,7 @@ class CameraDetection:
             return self._rectangle_found(rects)
         return self._goal_blob_fallback(b)
 
-    def _rectangle_found(self, rects: List) -> float:
+    def _rectangle_found(self, rects: list) -> float:
         r = max(rects, key=lambda x: x.w())
         self.img.draw_rectangle(r.rect())
         perceived = r.w()
@@ -160,7 +167,7 @@ class CameraDetection:
         perceived = b.w()
         return (self.GOAL_DIAMETER_CM * self.focal_length) / perceived
 
-    def calculate_xy(self, distance_cm: float) -> Tuple[float, float]:
+    def calculate_xy(self, distance_cm: float) -> tuple:
         d_xy = math.sqrt(max(distance_cm**2 - self.camera_height_cm**2, 0.0))
         screen_center = self.img.width() / 2.0
         ball_x_px = self.blob.cx() - screen_center
