@@ -15,8 +15,8 @@ class CameraDetection:
 
         # Color thresholds
         self.thresholds = {
-            "orange": (46, 100, -128, 127, 20, 127),
-            "blue": (0, 47, -7, 127, -128, -18),
+            "orange": (16, 100, 12, 127, 20, 127),
+            "blue": (0, 48, -7, 127, -128, -10),
             "yellow": (39, 100, -31, 3, 18, 127),
         }
 
@@ -82,6 +82,8 @@ class CameraDetection:
     def check_image(self) -> None:
         self.img = sensor.snapshot()
 
+
+
         orange_blobs = self.img.find_blobs([self.thresholds["orange"]],
                                            pixels_threshold=self.ball_pixels_threshold,
                                            area_threshold=self.ball_area_threshold, merge=True)
@@ -93,22 +95,37 @@ class CameraDetection:
                                            area_threshold=self.goal_area_threshold, merge=True)
 
         ball_distance = self._process_ball(orange_blobs) if orange_blobs else None
-        blue_distance = self._process_goal(blue_blobs) if blue_blobs else 0.0
-        yellow_distance = self._process_goal(yellow_blobs) if yellow_blobs else 0.0
+        blue_distance = self._process_goal(blue_blobs) if blue_blobs else None
+        yellow_distance = self._process_goal(yellow_blobs) if yellow_blobs else None
 
         if ball_distance:
-            x_cm, y_cm = self.calculate_xy(ball_distance)
+            x_cm, y_cm = self.calculate_xy(ball_distance, orange_blobs, self.BALL_DIAMETER_CM)
         else:
             x_cm, y_cm = 0.0, 0.0
 
+        if blue_distance:
+            blueX, blueY = self.calculate_xy(blue_distance, blue_blobs, self.GOAL_DIAMETER_CM)
+        else:
+            blueX, blueY = 0.0, 0.0
 
-        dis = [x_cm, y_cm, blue_distance, yellow_distance]
+        if yellow_distance:
+            yellowX, yellowY = self.calculate_xy(yellow_distance, yellow_blobs, self.GOAL_DIAMETER_CM)
+        else:
+            yellowX, yellowY = 0.0, 0.0
 
+        # draw center vertical for visualization
+        center_x = int(self.img.width() / 2)
+        self.img.draw_line(center_x, 0, center_x, self.img.height())
+
+        dis = [x_cm, y_cm, blueX, blueY, yellowX, yellowY]
         for i in range(len(dis)):
             if dis[i] >= self.MAX_LENGTH:
-                dis[i] = 0
+                dis[i] = "0"
+            else:
+                dis[i] = str(dis[i])
 
-        data = "{:.2f},{:.2f}#{:.2f}#{:.2f}\n".format(*(tuple(dis)))
+        # print(type(dis))
+        data = '#'.join(dis)
         print(data.strip())
         try:
             self.comms.write(data)
@@ -124,10 +141,6 @@ class CameraDetection:
         roi_img = self.img.copy(roi=roi)
         self.circles = roi_img.find_circles(threshold=2000, x_margin=0, y_margin=0,
                                             r_margin=2, r_min=1, r_max=30, r_step=2)
-
-        # draw center vertical for visualization
-        center_x = int(self.img.width() / 2)
-        self.img.draw_line(center_x, 0, center_x, self.img.height())
 
         if self.circles:
             return self._circle_found()
@@ -166,11 +179,12 @@ class CameraDetection:
         perceived = b.w()
         return (self.GOAL_DIAMETER_CM * self.focal_length) / perceived
 
-    def calculate_xy(self, distance_cm: float) -> tuple:
+    def calculate_xy(self, distance_cm: float, blobs, diameter_cm: float) -> tuple:
+        blob = max(blobs, key=lambda b: b.pixels())
         d_xy = math.sqrt(max(distance_cm**2 - self.camera_height_cm**2, 0.0))
         screen_center = self.img.width() / 2.0
-        ball_x_px = self.blob.cx() - screen_center
-        px_to_cm = (self.blob.w()) / self.BALL_DIAMETER_CM
+        ball_x_px = blob.cx() - screen_center
+        px_to_cm = (blob.w()) / diameter_cm
         d_x = ball_x_px / px_to_cm
         d_y = math.sqrt(max(d_xy**2 - d_x**2, 0.0))
         return d_x, d_y
