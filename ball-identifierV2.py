@@ -1,7 +1,7 @@
 import sensor
 import time
 import math
-from machine import UART, Pin
+from machine import UART, Pin, LED
 
 class CameraDetection:
     def __init__(self, exit_pin: str | int, focal_length: float = 0.0) -> None:
@@ -12,6 +12,9 @@ class CameraDetection:
         sensor.skip_frames(time=2000)
         sensor.set_auto_gain(False)
         sensor.set_auto_whitebal(False)
+        self.ledB = LED("LED_BLUE")
+        self.ledB.on()
+
 
         # Color thresholds
         self.thresholds = {
@@ -34,9 +37,9 @@ class CameraDetection:
         self.MAX_LENGTH = 200 #cm
 
         # UART
-        self.comms = UART(3, 9600)
+        self.comms = UART(1, 115200)
         try:
-            self.comms.init(9600, bits=8, parity=None, stop=1)
+            self.comms.init(115200, parity=None, stop=1)
         except Exception as e:
             print(e)
 
@@ -75,7 +78,7 @@ class CameraDetection:
                 perceived = (b.w() + b.h()) / 2.0
                 if perceived > 0:
                     self.focal_length = (perceived * known_distance_cm) / self.BALL_DIAMETER_CM
-                    print("Calibration done. FOCAL_LENGTH = {:.2f}".format(self.focal_length))
+                    print("Calibration done. FOCAL_LENGTH        = {:.2f}".format(self.focal_length))
                     return
         print("Calibration ended. FOCAL_LENGTH = {:.2f}".format(self.focal_length))
 
@@ -128,7 +131,7 @@ class CameraDetection:
         data = '#'.join(dis)
         print(data.strip())
         try:
-            self.comms.write(data)
+            self.comms.write(data.encode())
         except Exception as e:
             print(e)
 
@@ -190,9 +193,10 @@ class CameraDetection:
         return d_x, d_y
 
     def run(self) -> None:
-        while not self.EXIT:
+        # while not self.EXIT:
+        while True:
             self.check_image()
-            time.sleep(0.01)
+            time.sleep(1)
 
 def main():
     camera = CameraDetection(exit_pin="P0", focal_length=265.12)
