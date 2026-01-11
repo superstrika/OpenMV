@@ -131,7 +131,7 @@ class CameraDetection:
         data = '#'.join(dis)
         print(data.strip())
         try:
-            self.comms.write(data.encode())
+            self.comms.write((data + "\n").encode())
         except Exception as e:
             print(e)
 
@@ -193,10 +193,12 @@ class CameraDetection:
         return d_x, d_y
 
     def run(self) -> None:
-        # while not self.EXIT:
-        while True:
+        for _ in range(50):
             self.check_image()
-            time.sleep(1)
+            time.sleep(0.2)
+        # while not self.EXIT:
+        #     self.check_image()
+        #     time.sleep(0.2)
 
 def main():
     camera = CameraDetection(exit_pin="P0", focal_length=265.12)
