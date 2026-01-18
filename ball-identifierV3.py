@@ -1,7 +1,8 @@
 import sensor
 import time
 import math
-from machine import UART, Pin, LED
+from machine import Pin, LED
+import pyb
 
 class CameraDetection:
     def __init__(self, exit_pin: str | int, focal_length: float = 0.0) -> None:
@@ -36,13 +37,6 @@ class CameraDetection:
         self.camera_height_cm = 13.0
         self.MAX_LENGTH = 200 #cm
 
-        # UART
-        self.comms = UART(1, 115200)
-        try:
-            self.comms.init(115200, parity=None, stop=1)
-        except Exception as e:
-            print(e)
-
         # Exit pin
         self.EXIT = False
         self.exit_pin = Pin(exit_pin, Pin.IN, Pin.PULL_UP)
@@ -50,6 +44,9 @@ class CameraDetection:
             self.exit_pin.irq(trigger=Pin.IRQ_FALLING, handler=self._exit_handler)
         except Exception as e:
             print(e)
+
+        #Usb connection
+        self._usb = pyb.USB_VCP()
 
         # Working vars
         self.img = None
@@ -129,9 +126,11 @@ class CameraDetection:
 
         # print(type(dis))
         data = '#'.join(dis)
-        print(data.strip())
+        data += "\n"
+        #print(data.strip())
         try:
-            self.comms.write((data + "\n").encode())
+            if self._usb.isconnected():
+                self._usb.send(data)
         except Exception as e:
             print(e)
 
