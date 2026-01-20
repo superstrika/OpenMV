@@ -4,6 +4,21 @@ import math
 from machine import Pin, LED
 import pyb
 
+class Color():
+    RED = 0
+    GREEN = 1
+    BLUE = 2
+    WHITE = 3
+    YELLOW = 4
+    CYAN = 5
+    PURPLE = 6
+
+    def __init__(self, color: int):
+        self._value = color
+
+    def __eq__(self, other: int):
+        return self._value == other
+
 class CameraDetection:
     def __init__(self, exit_pin: str | int, focal_length: float = 0.0) -> None:
         # Camera setup
@@ -13,6 +28,8 @@ class CameraDetection:
         sensor.skip_frames(time=2000)
         sensor.set_auto_gain(False)
         sensor.set_auto_whitebal(False)
+        self.ledR = LED("LED_RED")
+        self.ledG = LED("LED_GREEN")
         self.ledB = LED("LED_BLUE")
         self.ledB.on()
 
@@ -39,7 +56,7 @@ class CameraDetection:
 
         # Exit pin
         self.EXIT = False
-        self.exit_pin = Pin(exit_pin, Pin.IN, Pin.PULL_UP)
+        self.exit_pin = Pin(exit_pin, Pin.IN, Pin.PULL_DOWN)
         try:
             self.exit_pin.irq(trigger=Pin.IRQ_FALLING, handler=self._exit_handler)
         except Exception as e:
@@ -100,8 +117,10 @@ class CameraDetection:
 
         if ball_distance:
             x_cm, y_cm = self.calculate_xy(ball_distance, orange_blobs, self.BALL_DIAMETER_CM)
+            self.setLedColor(Color.PURPLE)
         else:
             x_cm, y_cm = 0.0, 0.0
+            self.setLedColor(Color.WHITE)
 
         if blue_distance:
             blueX, blueY = self.calculate_xy(blue_distance, blue_blobs, self.GOAL_DIAMETER_CM)
@@ -192,12 +211,42 @@ class CameraDetection:
         return d_x, d_y
 
     def run(self) -> None:
-        for _ in range(50):
-            self.check_image()
-            time.sleep(0.2)
-        # while not self.EXIT:
+        # for _ in range(2000):
         #     self.check_image()
-        #     time.sleep(0.2)
+        while not self.EXIT:
+            # print(self.exit_pin.value())
+            self.check_image()
+            time.sleep(0.02)
+
+    def setLedColor(self, color: Color):
+        if color == Color.WHITE:
+            self.ledR.on()
+            self.ledG.on()
+            self.ledB.on()
+        elif color == Color.RED:
+            self.ledR.on()
+            self.ledG.off()
+            self.ledB.off()
+        elif color == Color.GREEN:
+            self.ledR.off()
+            self.ledG.on()
+            self.ledB.off()
+        elif color == Color.BLUE:
+            self.ledR.off()
+            self.ledG.off()
+            self.ledB.on()
+        elif color == Color.YELLOW:
+            self.ledR.on()
+            self.ledG.on()
+            self.ledB.off()
+        elif color == Color.CYAN:
+            self.ledR.off()
+            self.ledG.on()
+            self.ledB.on()
+        elif color == Color.PURPLE:
+            self.ledR.on()
+            self.ledG.off()
+            self.ledB.on()
 
 def main():
     camera = CameraDetection(exit_pin="P3", focal_length=265.12)
