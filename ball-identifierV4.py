@@ -240,11 +240,17 @@ class CameraDetection:
         r = max(rects, key=lambda x: x.w())
         self.img.draw_rectangle(r.rect())
         perceived = r.w()
+
+        if perceived == 0:
+            return 0
         return (self.GOAL_DIAMETER_CM * self.focal_length) / perceived
 
     def _goal_blob_fallback(self, b) -> float:
         self.img.draw_rectangle(b.rect())
         perceived = b.w()
+
+        if perceived == 0:
+            return 0
         return (self.GOAL_DIAMETER_CM * self.focal_length) / perceived
 
     def calculate_xy(self, distance_cm: float, blobs, diameter_cm: float) -> tuple:
@@ -261,13 +267,16 @@ class CameraDetection:
         # for _ in range(2000):
         #     self.check_image()
         while not self.EXIT:
+            try:
             # read any incoming USB commands from the Raspberry Pi
-            self._read_usb_commands()
-            # print(self.exit_pin.value())
-            if self.EXIT:
-                break
-            self.check_image()
-            time.sleep(0.02)
+                self._read_usb_commands()
+                # print(self.exit_pin.value())
+                if self.EXIT:
+                    break
+                self.check_image()
+                time.sleep(0.02)
+            except ZeroDivisionError as e:
+                print(e)
 
     def setLedColor(self, color: int):
         if color == Color.WHITE:
