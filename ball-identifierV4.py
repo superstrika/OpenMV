@@ -22,25 +22,26 @@ class Color:
         return self._value == other
 
 class CameraDetection:
-    def __init__(self, exit_pin: str | int, focal_length: float = 0.0) -> None:
+    def __init__(self, exit_pin: str | int, focal_length: float = 0.0, gain_db: int = 12) -> None:
         # Camera setup
         sensor.reset()
         sensor.set_pixformat(sensor.RGB565)
         sensor.set_framesize(sensor.QVGA)
         sensor.skip_frames(time=2000)
-        sensor.set_auto_gain(False)
-        sensor.set_auto_whitebal(False)
+
+        sensor.set_auto_exposure(True)
+        sensor.set_auto_gain(False, gain_db=gain_db)
+
         self.ledR = LED("LED_RED")
         self.ledG = LED("LED_GREEN")
         self.ledB = LED("LED_BLUE")
         self.ledB.on()
 
-
         # Color thresholds
         self.thresholds = {
-            "orange": (16, 100, 12, 127, 20, 127),
+            "orange": (13, 100, 40, 10, 20, 101),
             "blue": (0, 48, -7, 127, -128, -10),
-            "yellow": (39, 100, -31, 3, 18, 127),
+            "yellow": (33, 80, -20, 22, 26, 127),
         }
 
         # Detection params
@@ -309,7 +310,7 @@ class CameraDetection:
             self.ledB.on()
 
 def main():
-    camera = CameraDetection(exit_pin="P3", focal_length=265.12)
+    camera = CameraDetection(exit_pin="P3", focal_length=265.12, gain_db=12)
     camera.run()
 
 if __name__ == "__main__":
