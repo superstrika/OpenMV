@@ -299,7 +299,7 @@ class CameraDetection:
                 if self.EXIT:
                     break
                 self.check_image()
-                time.sleep(0.02)
+                time.sleep(0.01)
             except ZeroDivisionError as e:
                 print(e)
 
@@ -334,7 +334,7 @@ class CameraDetection:
             self.ledB.on()
 
 def main():
-    camera = CameraDetection(exit_pin="P3", focal_length=265.12, gain_db=12)
+    camera = CameraDetection(exit_pin="P3", focal_length=265.12, gain_db=14)
     camera.run()
 
 if __name__ == "__main__":
