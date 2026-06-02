@@ -39,7 +39,9 @@ class CameraDetection:
 
         # Color thresholds
         self.thresholds = {
-            "orange": (13, 100, 40, 10, 20, 101),
+            # "orange": (13, 100, 40, 10, 20, 101),
+            # "orange": (0, 100, -128, 127, 26, 127),
+            "orange": (0, 100, -13, 127, 25, 127),
             "blue": (0, 48, -7, 127, -128, -10),
             "yellow": (33, 80, -20, 22, 26, 127),
         }
@@ -334,7 +336,7 @@ class CameraDetection:
             self.ledB.on()
 
 def main():
-    camera = CameraDetection(exit_pin="P3", focal_length=265.12, gain_db=14)
+    camera = CameraDetection(exit_pin="P3", focal_length=265.12, gain_db=11)
     camera.run()
 
 if __name__ == "__main__":
