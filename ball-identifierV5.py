@@ -39,13 +39,15 @@ class CameraDetection:
 
         # Color thresholds
         self.thresholds = {
-            # "orange": (13, 100, 40, 10, 20, 101),
+            "blue": (0, 48, -7, 127, -128, -40),
+            "orange": (0, 100, 20, 127, 21, 127),
+            "yellow": (33, 80, -20, 22, 26, 127),
+            # "blue": (0, 48, -7, 127, -128, -10),
+            # "orange": (0, 100, -11, 127, 12, 127),
             # "orange": (0, 100, -128, 127, 26, 127),
             # "orange": (0, 100, -13, 127, 25, 127),
-            # "orange": (0, 100, -11, 127, 12, 127),
-            "orange": (0, 100, 12, 127, 12, 127),
-            "blue": (0, 48, -7, 127, -128, -10),
-            "yellow": (33, 80, -20, 22, 26, 127),
+            # "orange": (0, 100, 12, 127, 12, 127),
+            # "orange": (13, 100, 40, 10, 20, 101),
         }
 
         # Detection params
@@ -164,12 +166,12 @@ class CameraDetection:
                                            area_threshold=self.goal_area_threshold, merge=True)
 
         ball_distance = self._process_ball(orange_blobs) if orange_blobs else None
-        blue_distance = self._process_goal(blue_blobs) if blue_blobs else None
-        yellow_distance = self._process_goal(yellow_blobs) if yellow_blobs else None
+        blue_distance = self._process_goal(blue_blobs, color_rgb=(0, 0, 255)) if blue_blobs else None
+        yellow_distance = self._process_goal(yellow_blobs, color_rgb=(255, 255, 0)) if yellow_blobs else None
 
         if ball_distance:
             x_cm, y_cm = self.calculate_xy(ball_distance, orange_blobs, self.BALL_DIAMETER_CM)
-            self.setLedColor(Color.GREEN)
+            self.setLedColor(Color.RED)
         else:
             x_cm, y_cm = 0.0, 0.0
             self.setLedColor(Color.WHITE)
@@ -183,6 +185,12 @@ class CameraDetection:
             yellowX, yellowY = self.calculate_xy(yellow_distance, yellow_blobs, self.GOAL_DIAMETER_CM)
         else:
             yellowX, yellowY = 0.0, 0.0
+
+        if yellow_distance and not ball_distance:
+            self.setLedColor(Color.YELLOW)
+
+        if blue_distance and not ball_distance:
+            self.setLedColor(Color.BLUE)
 
         # draw center vertical for visualization
         center_x = int(self.img.width() / 2)
@@ -256,26 +264,39 @@ class CameraDetection:
         perceived = (self.blob.w() + self.blob.h()) / 2.0
         return (self.BALL_DIAMETER_CM * self.focal_length) / perceived
 
-    def _process_goal(self, blobs: list) -> float:
-        b = max(blobs, key=lambda x: x.pixels())
-        roi = (b.x(), b.y(), b.w(), b.h())
-        roi_img = self.img.copy(roi=roi)
-        rects = roi_img.find_rects(threshold=2000)
-        if rects:
-            return self._rectangle_found(rects)
-        return self._goal_blob_fallback(b)
+    def _process_goal(self, blobs: list, color_rgb) -> float:
+        blobs = list(filter(lambda b: b.w() / b.h() > 3, blobs))
+        b = max(blobs, key=lambda x: x.pixels()) if blobs else None
+        if b is None:
+            return 0.0
+        # roi = (b.x(), b.y(), b.w(), b.h())
+        # roi_img = self.img.copy(roi=roi)
+        # rects = roi_img.find_rects(threshold=2000)
+        # rects = roi_img.find_rects()
+        # if rects:
+        #     return self._rectangle_found(rects, b, color_rgb)
+        return self._goal_blob_fallback(b, color_rgb)
 
-    def _rectangle_found(self, rects: list) -> float:
+    def _rectangle_found(self, rects: list, b, color_rgb) -> float:
         r = max(rects, key=lambda x: x.w())
-        self.img.draw_rectangle(r.rect())
-        perceived = r.w()
 
+        actual_x = r.x() + b.x()
+        actual_y = r.y() + b.y()
+        actual_w = r.w()
+        actual_h = r.h()
+
+        # 2. Draw using the four correct, explicit values
+        self.img.draw_rectangle(actual_x, actual_y, actual_w, actual_h,color=color_rgb, fill=False, thickness=2)
+
+        perceived = r.w()
+        # print(f"{perceived=}")
+        # time.sleep(2)
         if perceived == 0:
             return 0
         return (self.GOAL_DIAMETER_CM * self.focal_length) / perceived
 
-    def _goal_blob_fallback(self, b) -> float:
-        self.img.draw_rectangle(b.rect())
+    def _goal_blob_fallback(self, b, color_rgb) -> float:
+        self.img.draw_rectangle(b.rect(), color=color_rgb, fill=False, thickness=2)
         perceived = b.w()
 
         if perceived == 0:
@@ -338,7 +359,7 @@ class CameraDetection:
             self.ledB.on()
 
 def main():
-    camera = CameraDetection(exit_pin="P3", focal_length=265.12, gain_db=15)
+    camera = CameraDetection(exit_pin="P3", focal_length=265.12, gain_db=8)
     camera.run()
 
 if __name__ == "__main__":
